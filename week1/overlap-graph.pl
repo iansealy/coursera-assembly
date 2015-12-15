@@ -26,8 +26,8 @@ get_and_check_options();
 my (@patterns) = path($input_file)->lines( { chomp => 1 } );
 
 my $graph = overlap_graph(@patterns);
-foreach my $pattern1 (sort keys %{$graph}) {
-    foreach my $pattern2 (sort keys %{$graph->{$pattern1}}) {
+foreach my $pattern1 ( sort keys %{$graph} ) {
+    foreach my $pattern2 ( sort keys %{ $graph->{$pattern1} } ) {
         printf "%s -> %s\n", $pattern1, $pattern2;
     }
 }
@@ -37,15 +37,15 @@ sub overlap_graph {
 
     my %pattern_for;
     foreach my $pattern (@patterns) {
-        my $prefix = substr $pattern, 0, -1;
-        push @{$pattern_for{$prefix}}, $pattern;
+        my $prefix = substr $pattern, 0, -1; ## no critic (ProhibitMagicNumbers)
+        push @{ $pattern_for{$prefix} }, $pattern;
     }
 
     my %graph;
     foreach my $pattern (@patterns) {
         my $suffix = substr $pattern, 1;
-        if (exists $pattern_for{$suffix}) {
-            foreach my $overlap_pattern (@{$pattern_for{$suffix}}) {
+        if ( exists $pattern_for{$suffix} ) {
+            foreach my $overlap_pattern ( @{ $pattern_for{$suffix} } ) {
                 next if $pattern eq $overlap_pattern;
                 $graph{$pattern}{$overlap_pattern} = 1;
             }
