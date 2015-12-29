@@ -25,7 +25,7 @@ get_and_check_options();
 
 my ( undef, @patterns ) = path($input_file)->lines( { chomp => 1 } );
 
-my @path = eulerian_path( overlap_graph(@patterns) );
+my @path = eulerian_path( de_bruijn_graph(@patterns) );
 ## no critic (ProhibitMagicNumbers)
 my $text = substr $path[0], 0, -1;
 $text .= join q{}, map { substr $_, -1 } @path;
@@ -33,24 +33,15 @@ $text .= join q{}, map { substr $_, -1 } @path;
 
 printf "%s\n", $text;
 
-sub overlap_graph {
+sub de_bruijn_graph {
     my (@patterns) = @_;    ## no critic (ProhibitReusedNames)
 
-    my %pattern_for;
+    my %graph;
+
     foreach my $pattern (@patterns) {
         my $prefix = substr $pattern, 0, -1; ## no critic (ProhibitMagicNumbers)
-        push @{ $pattern_for{$prefix} }, $pattern;
-    }
-
-    my %graph;
-    foreach my $pattern (@patterns) {
         my $suffix = substr $pattern, 1;
-        if ( exists $pattern_for{$suffix} ) {
-            foreach my $overlap_pattern ( @{ $pattern_for{$suffix} } ) {
-                next if $pattern eq $overlap_pattern;
-                $graph{$pattern}{$overlap_pattern} = 1;
-            }
-        }
+        $graph{$prefix}{$suffix} = 1;
     }
 
     return \%graph;
