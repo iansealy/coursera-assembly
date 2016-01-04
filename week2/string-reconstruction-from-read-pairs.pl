@@ -26,8 +26,13 @@ get_and_check_options();
 my ( $integers, @patterns ) = path($input_file)->lines( { chomp => 1 } );
 my ( $k, $d ) = split /\s+/xms, $integers;
 
-my @path = eulerian_path( de_bruijn_graph(@patterns) );
-printf "%s\n", string_spelled_by_gapped_patterns( \@path, $k, $d );
+my $string;
+while ( !$string ) {
+    my @path = eulerian_path( de_bruijn_graph(@patterns) );
+    $string = string_spelled_by_gapped_patterns( \@path, $k, $d );
+}
+
+printf "%s\n", $string;
 
 sub de_bruijn_graph {
     my (@patterns) = @_;    ## no critic (ProhibitReusedNames)
@@ -42,7 +47,7 @@ sub de_bruijn_graph {
         my $suffix = $pattern;
         $suffix =~ s/[|]./|/xms;
         $suffix =~ s/\A.//xms;
-        $graph{$prefix}{$suffix} = 1;
+        $graph{$prefix}{$suffix}++;
     }
 
     return \%graph;
@@ -54,12 +59,15 @@ sub eulerian_path {
     my $node  = start_node($graph);
     my @cycle = ($node);
     my $pos   = 0;
-    while ( keys %{$graph} ) {
+    while ( $node && keys %{$graph} ) {
         while ( exists $graph->{$node} ) {
             my $next_node = ( keys %{ $graph->{$node} } )[0];   # Arbitrary node
-            delete $graph->{$node}{$next_node};
-            if ( !keys %{ $graph->{$node} } ) {
-                delete $graph->{$node};
+            $graph->{$node}{$next_node}--;
+            if ( $graph->{$node}{$next_node} == 0 ) {
+                delete $graph->{$node}{$next_node};
+                if ( !keys %{ $graph->{$node} } ) {
+                    delete $graph->{$node};
+                }
             }
             splice @cycle, ++$pos, 0, $next_node;
             $node = $next_node;
@@ -91,10 +99,15 @@ sub new_start_node {
     my ( $cycle, $graph ) = @_;
 
     my $pos = 0;
+    my @node_pos;
     foreach my $node ( @{$cycle} ) {
-        return $node, $pos if exists $graph->{$node};
+        if ( exists $graph->{$node} ) {
+            push @node_pos, [ $node, $pos ];
+        }
         $pos++;
     }
+
+    return @{ $node_pos[ int rand scalar @node_pos ] } if @node_pos;
 
     return;
 }
@@ -126,7 +139,7 @@ sub string_spelled_by_gapped_patterns {
 sub string_spelled_by_patterns {
     my ( $kmers, $k ) = @_;    ## no critic (ProhibitReusedNames)
 
-    my $string = q{};
+    my $string = q{};          ## no critic (ProhibitReusedNames)
     $string .= join q{}, map { substr $_, 0, 1 } @{$kmers};
     $string .= substr $kmers->[-1], 1;
 
