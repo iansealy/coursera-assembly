@@ -150,7 +150,7 @@ version 0.1.0
 
 =head1 DESCRIPTION
 
-This script solves the Linear Peptide Scoring Problem.
+This script implements Trim.
 
 Input: A collection of peptides I<Leaderboard>, a collection of integers
 I<Spectrum>, and an integer I<N>.
