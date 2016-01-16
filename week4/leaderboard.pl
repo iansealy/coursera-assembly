@@ -21,7 +21,7 @@ my @AMINO_ACID_MASS =
 
 # Default options
 my $input_file = 'leaderboard-sample-input.txt';
-my ( $debug, $help, $man );
+my ( $all, $debug, $help, $man );
 
 # Get and check command line options
 get_and_check_options();
@@ -29,22 +29,34 @@ get_and_check_options();
 my ( $n, $spectrum ) = path($input_file)->lines( { chomp => 1 } );
 my @spectrum = split /\s+/xms, $spectrum;
 
-printf "%s\n", join q{-}, leaderboard_cyclopeptide_sequencing( $n, @spectrum );
+if ( !$all ) {
+    printf "%s\n", join q{-},
+      @{ ( leaderboard_cyclopeptide_sequencing( $n, @spectrum ) )[0] };
+}
+else {
+    printf "%s\n", join q{ },
+      map { join q{-}, @{$_} }
+      leaderboard_cyclopeptide_sequencing( $n, @spectrum );
+}
 
 sub leaderboard_cyclopeptide_sequencing {
     my ( $n, @spectrum ) = @_;    ## no critic (ProhibitReusedNames)
 
     my @leaderboard = ( [] );
-    my $leader_peptide = [];
+    my $leader_peptide_score = 0;
+    my @leader_peptides;
     while (@leaderboard) {
         my @keep_peptides;
         @leaderboard = expand(@leaderboard);
         foreach my $peptide (@leaderboard) {
             if ( mass($peptide) == $spectrum[-1] ) {
-                if ( linear_scoring( $peptide, @spectrum ) >
-                    linear_scoring( $leader_peptide, @spectrum ) )
-                {
-                    $leader_peptide = $peptide;
+                my $peptide_score = cyclic_scoring( $peptide, @spectrum );
+                if ( $peptide_score > $leader_peptide_score ) {
+                    $leader_peptide_score = $peptide_score;
+                    @leader_peptides      = ($peptide);
+                }
+                elsif ( $peptide_score == $leader_peptide_score ) {
+                    push @leader_peptides, $peptide;
                 }
                 push @keep_peptides, $peptide;
             }
@@ -55,7 +67,7 @@ sub leaderboard_cyclopeptide_sequencing {
         @leaderboard = trim( \@keep_peptides, \@spectrum, $n );
     }
 
-    return @{$leader_peptide};
+    return @leader_peptides;
 }
 
 sub expand {
@@ -137,6 +149,45 @@ sub linear_spectrum {
     return @linear_spectrum;
 }
 
+sub cyclic_scoring {
+    my ( $peptide, @spectrum ) = @_;    ## no critic (ProhibitReusedNames)
+
+    my @theoretical_spectrum = cyclic_spectrum($peptide);
+
+    return score_spectra( \@spectrum, \@theoretical_spectrum );
+}
+
+sub cyclic_spectrum {
+    my ($peptide) = @_;
+
+    my @prefix_mass = (0);
+
+    foreach my $i ( 0 .. ( scalar @{$peptide} ) - 1 ) {
+        foreach my $j ( 0 .. 17 ) {    ## no critic (ProhibitMagicNumbers)
+            if ( $AMINO_ACID_MASS[$j] == $peptide->[$i] ) {
+                push @prefix_mass, $prefix_mass[$i] + $AMINO_ACID_MASS[$j];
+            }
+        }
+    }
+
+    my $peptide_mass = $prefix_mass[-1];
+
+    my @cyclic_spectrum = (0);
+
+    foreach my $i ( 0 .. ( scalar @{$peptide} ) - 1 ) {
+        foreach my $j ( $i + 1 .. scalar @{$peptide} ) {
+            push @cyclic_spectrum, $prefix_mass[$j] - $prefix_mass[$i];
+            if ( $i > 0 && $j < scalar @{$peptide} ) {
+                push @cyclic_spectrum, $prefix_mass[-1] - $cyclic_spectrum[-1];
+            }
+        }
+    }
+
+    @cyclic_spectrum = sort { $a <=> $b } @cyclic_spectrum;
+
+    return @cyclic_spectrum;
+}
+
 sub score_spectra {
     my ( $spectrum1, $spectrum2 ) = @_;
 
@@ -167,6 +218,7 @@ sub get_and_check_options {
     # Get options
     GetOptions(
         'input_file=s' => \$input_file,
+        'all'          => \$all,
         'debug'        => \$debug,
         'help'         => \$help,
         'man'          => \$man,
@@ -221,10 +273,14 @@ I<LeaderboardCyclopeptideSequencing>(I<Spectrum>, I<N>).
     perl leaderboard.pl --input_file dataset_102_7.txt \
         > dataset_102_7_output.txt
 
+    perl leaderboard.pl --all --input_file dataset_102_9.txt \
+        > dataset_102_9_output.txt
+
 =head1 USAGE
 
     leaderboard.pl
         [--input_file FILE]
+        [--all]
         [--debug]
         [--help]
         [--man]
@@ -237,6 +293,10 @@ I<LeaderboardCyclopeptideSequencing>(I<Spectrum>, I<N>).
 
 The input file containing "An integer I<N> and a collection of integers
 I<Spectrum>".
+
+=item B<--all>
+
+Return all linear peptides with maximum score.
 
 =item B<--debug>
 
