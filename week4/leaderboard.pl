@@ -16,18 +16,22 @@ use Carp;
 use Path::Tiny;
 use version; our $VERSION = qv('v0.1.0');
 
-my @AMINO_ACID_MASS =
+my @amino_acid_mass =
   qw(57 71 87 97 99 101 103 113 114 115 128 129 131 137 147 156 163 186);
 
 # Default options
 my $input_file = 'leaderboard-sample-input.txt';
-my ( $all, $debug, $help, $man );
+my ( $all, $extended, $debug, $help, $man );
 
 # Get and check command line options
 get_and_check_options();
 
 my ( $n, $spectrum ) = path($input_file)->lines( { chomp => 1 } );
 my @spectrum = split /\s+/xms, $spectrum;
+
+if ($extended) {
+    @amino_acid_mass = ( 57 .. 200 );    ## no critic (ProhibitMagicNumbers)
+}
 
 if ( !$all ) {
     printf "%s\n", join q{-},
@@ -76,7 +80,7 @@ sub expand {
     my @expanded_peptides;
 
     foreach my $peptide (@peptides) {
-        foreach my $amino_acid (@AMINO_ACID_MASS) {
+        foreach my $amino_acid (@amino_acid_mass) {
             push @expanded_peptides, [ @{$peptide}, $amino_acid ];
         }
     }
@@ -129,9 +133,9 @@ sub linear_spectrum {
     my @prefix_mass = (0);
 
     foreach my $i ( 0 .. ( scalar @{$peptide} ) - 1 ) {
-        foreach my $j ( 0 .. 17 ) {    ## no critic (ProhibitMagicNumbers)
-            if ( $AMINO_ACID_MASS[$j] == $peptide->[$i] ) {
-                push @prefix_mass, $prefix_mass[$i] + $AMINO_ACID_MASS[$j];
+        foreach my $j ( 0 .. ( scalar @amino_acid_mass ) - 1 ) {
+            if ( $amino_acid_mass[$j] == $peptide->[$i] ) {
+                push @prefix_mass, $prefix_mass[$i] + $amino_acid_mass[$j];
             }
         }
     }
@@ -163,9 +167,9 @@ sub cyclic_spectrum {
     my @prefix_mass = (0);
 
     foreach my $i ( 0 .. ( scalar @{$peptide} ) - 1 ) {
-        foreach my $j ( 0 .. 17 ) {    ## no critic (ProhibitMagicNumbers)
-            if ( $AMINO_ACID_MASS[$j] == $peptide->[$i] ) {
-                push @prefix_mass, $prefix_mass[$i] + $AMINO_ACID_MASS[$j];
+        foreach my $j ( 0 .. ( scalar @amino_acid_mass ) - 1 ) {
+            if ( $amino_acid_mass[$j] == $peptide->[$i] ) {
+                push @prefix_mass, $prefix_mass[$i] + $amino_acid_mass[$j];
             }
         }
     }
@@ -219,6 +223,7 @@ sub get_and_check_options {
     GetOptions(
         'input_file=s' => \$input_file,
         'all'          => \$all,
+        'extended'     => \$extended,
         'debug'        => \$debug,
         'help'         => \$help,
         'man'          => \$man,
@@ -276,11 +281,15 @@ I<LeaderboardCyclopeptideSequencing>(I<Spectrum>, I<N>).
     perl leaderboard.pl --all --input_file dataset_102_9.txt \
         > dataset_102_9_output.txt
 
+    perl leaderboard.pl --all --extended --input_file dataset_103_1.txt \
+        > dataset_103_1_output.txt
+
 =head1 USAGE
 
     leaderboard.pl
         [--input_file FILE]
         [--all]
+        [--extended]
         [--debug]
         [--help]
         [--man]
@@ -297,6 +306,10 @@ I<Spectrum>".
 =item B<--all>
 
 Return all linear peptides with maximum score.
+
+=item B<--extended>
+
+Use extended amino acid alphabet.
 
 =item B<--debug>
 
